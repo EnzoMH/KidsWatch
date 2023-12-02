@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.DrawerDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,7 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -49,11 +47,19 @@ import java.util.Date
 import java.util.Locale
 import android.Manifest
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.graphics.asImageBitmap
-import coil.compose.rememberImagePainter
+import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
 
 
 class MainActivity : ComponentActivity() {
@@ -199,6 +205,27 @@ fun MainScreen(navController: NavController) {
             )
         }
 
+        var selectUri by remember { mutableStateOf<Uri?>(null) }
+        val scope = rememberCoroutineScope()
+        val launcher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickVisualMedia(),
+            //url == 유니크한 경로
+            onResult = { uri ->
+                if (uri != null){
+                    scope.launch {
+                        selectUri = uri
+                        val inputStream = context.contentResolver.openInputStream(uri)
+                        val file = File(context.cacheDir, "image.png")
+                        inputStream?.use { input ->
+                            file.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        val result = postAndGetResult(file)
+                    }
+                }
+            }
+        )
 
 //// 사용자가 버튼을 눌렀을 때 포토피커 실행
 //        Button(onClick = {
@@ -211,6 +238,11 @@ fun MainScreen(navController: NavController) {
             Text("그림판 이동")
         }
         Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = {
+            launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }) {
+            Text("앨범에서 가져오기")
+        }
         Button(onClick = { navController.navigate("result/분석결과") }) {
             Text("진단하기")
         }
@@ -266,3 +298,56 @@ fun ResultScreen(result: String?) {
 //        MainScreen(navController)
 //    }
 //}
+
+@Composable
+fun UriToFile(uri: Uri): File {
+    val context = LocalContext.current
+    val inputStream = context.contentResolver.openInputStream(uri)
+    val file = File(context.cacheDir, "image.png")
+    inputStream?.use { input ->
+        file.outputStream().use { output ->
+            input.copyTo(output)
+        }
+    }
+    return file
+}
+
+suspend fun postAndGetResult(file: File) : String = withContext(Dispatchers.IO){
+    val url = "http://192.168.45.244:5000/predict"
+    val client = OkHttpClient()
+
+    val reqestBody = MultipartBody.Builder()
+        .setType(MultipartBody.FORM)
+        .addFormDataPart(
+            "image",
+            "image.png",
+            RequestBody.create(MediaType.parse("image/*"), file))
+        .build()
+
+    val request = Request.Builder()
+        .url(url)
+        .post(reqestBody)
+        .build()
+
+    try {
+        val response = client.newCall(request).execute()
+
+        if (response.isSuccessful){
+            val responseBody = response.body()?.string()
+
+            val gson = Gson()
+            val result = gson.fromJson(responseBody, Result::class.java)
+            Log.d("result", result.toString())
+            return@withContext result.result
+        } else {
+            Log.d("result", "실패")
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    } as String
+}
+
+data class Result(
+    @SerializedName("predicted_class")
+    val result: String
+)
