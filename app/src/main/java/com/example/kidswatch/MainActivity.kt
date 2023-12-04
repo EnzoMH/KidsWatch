@@ -46,11 +46,20 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import android.Manifest
+import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.os.Build
+import android.provider.MediaStore
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import coil.compose.rememberImagePainter
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.Dispatchers
@@ -60,6 +69,8 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
+import java.io.IOException
+import java.net.URLEncoder
 
 
 class MainActivity : ComponentActivity() {
@@ -84,11 +95,10 @@ fun App() {
     NavHost(navController, startDestination = "main") {
         composable("main") { MainScreen(navController) }
         composable("draw") { DrawScreen(navController) }
-        composable(
-            "result/{result}",
-            arguments = listOf(navArgument("result") { type = NavType.StringType })
-        ) { backStackEntry ->
-            ResultScreen(backStackEntry.arguments?.getString("result"))
+        composable("result/{result}/{uri}") {
+            val result = it.arguments?.getString("result")
+            val uri = it.arguments?.getString("uri")
+            ResultScreen(result, uri)
         }
     }
 }
@@ -97,24 +107,40 @@ fun App() {
 fun MainScreen(navController: NavController) {
     val context = LocalContext.current
     var imageUri by remember { mutableStateOf<Uri?>(null) }
-    var selectUris by remember { mutableStateOf<MutableList<Uri?>?>(mutableListOf()) }
     val scope = rememberCoroutineScope()
-    val maxUrisSize = 3
-    var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var result by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
+//        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "메인 화면",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+//        Text(
+//            text = "메인 화면",
+//            style = MaterialTheme.typography.headlineLarge,
+//            fontWeight = FontWeight.Bold,
+//            modifier = Modifier.padding(bottom = 16.dp)
+//        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
+            Button(onClick = {})
+            {
+                Text(
+                    text = "Kidswatch",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.width(5.dp))
+            Button(onClick = {}, modifier = Modifier.padding(8.dp)) {
+                Text("메뉴")
+            }
+        }
 
         //카메라 퍼미션 확인
         var hasCameraPermission by remember {
@@ -140,6 +166,7 @@ fun MainScreen(navController: NavController) {
                 ).show()
             }
         }
+
         //카메라로 찍은 파일 Uri로 바꿔줌
         fun createImageUri(): Uri {
             val timestamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
@@ -162,24 +189,21 @@ fun MainScreen(navController: NavController) {
                 // 사진 촬영 성공, imageUri에 이미지가 저장됨
                 scope.launch {
                     imageUri?.let { uri ->
-                        //이미지 uri들을 selectUris에 하나씩 저장
-                        selectUris?.let { uris ->
-                            val newList = uris.toMutableList()
-                            newList.add(uri)
-                            selectUris = if (newList.size > maxUrisSize) {
-                                newList.takeLast(maxUrisSize).toMutableList()
-                            } else {
-                                newList
+                        val inputStream = context.contentResolver.openInputStream(uri)
+                        val file = File(context.cacheDir, "image.png")
+                        inputStream?.use { input ->
+                            file.outputStream().use { output ->
+                                input.copyTo(output)
                             }
                         }
-
+                        result = postAndGetResult(file)
+                        Log.d("result", result)
                     }
                 }
             } else {
                 Log.e("사진 촬영 실패", "실패실패실패실패실패실패")
             }
         }
-
 
 
         // 사용자가 버튼을 눌렀을 때 카메라 실행
@@ -194,26 +218,12 @@ fun MainScreen(navController: NavController) {
             Text("카메라로 사진 찍기")
         }
 
-        // 찍은 사진이 있을 때만 이미지 표시
-        capturedBitmap?.let { bitmap ->
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(200.dp)
-                    .padding(16.dp)
-            )
-        }
-
-        var selectUri by remember { mutableStateOf<Uri?>(null) }
-        val scope = rememberCoroutineScope()
         val launcher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.PickVisualMedia(),
-            //url == 유니크한 경로
             onResult = { uri ->
-                if (uri != null){
+                if (uri != null) {
                     scope.launch {
-                        selectUri = uri
+                        imageUri = uri
                         val inputStream = context.contentResolver.openInputStream(uri)
                         val file = File(context.cacheDir, "image.png")
                         inputStream?.use { input ->
@@ -221,18 +231,11 @@ fun MainScreen(navController: NavController) {
                                 input.copyTo(output)
                             }
                         }
-                        val result = postAndGetResult(file)
+                        result = postAndGetResult(file)
                     }
                 }
             }
         )
-
-//// 사용자가 버튼을 눌렀을 때 포토피커 실행
-//        Button(onClick = {
-//            singlePhotoLoader.launch(null)
-//        }) {
-//            Text("사진 가져오기")
-//        }
 
         Button(onClick = { navController.navigate("draw") }) {
             Text("그림판 이동")
@@ -243,61 +246,32 @@ fun MainScreen(navController: NavController) {
         }) {
             Text("앨범에서 가져오기")
         }
-        Button(onClick = { navController.navigate("result/분석결과") }) {
+        //selectUri가 null이 아닐 때만 이미지 표시 coil 라이브러리 사용
+        imageUri?.let { uri ->
+            val bitmap = uriToBitmap(uri, context)
+            bitmap?.asImageBitmap()?.let {
+                Image(
+                    bitmap = it,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(200.dp)
+                        .padding(16.dp)
+                )
+            }
+        }
+
+        Text(text = "분석 결과: $result")
+        Button(
+            onClick = {
+                val uri = URLEncoder.encode(imageUri?.toString(), "UTF-8")
+                navController.navigate("result/${result}/${uri}")
+            }
+        )
+        {
             Text("진단하기")
         }
     }
 }
-
-@Composable
-fun DrawScreen(navController: NavController) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "카메라 화면",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        Button(onClick = { navController.navigate("result/분석결과") }) {
-            Text("분석 결과 확인")
-        }
-    }
-}
-
-@Composable
-fun ResultScreen(result: String?) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "결과 화면",
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        Text(text = "분석 결과: $result")
-    }
-}
-
-
-//@Preview(showBackground = true)
-//@Composable
-//fun GreetingPreview() {
-//    KidsWatchTheme {
-//        MainScreen(navController)
-//    }
-//}
 
 @Composable
 fun UriToFile(uri: Uri): File {
@@ -312,8 +286,8 @@ fun UriToFile(uri: Uri): File {
     return file
 }
 
-suspend fun postAndGetResult(file: File) : String = withContext(Dispatchers.IO){
-    val url = "http://192.168.45.244:5000/predict"
+suspend fun postAndGetResult(file: File): String = withContext(Dispatchers.IO) {
+    val url = "http://192.168.1.22:5000/predict"
     val client = OkHttpClient()
 
     val reqestBody = MultipartBody.Builder()
@@ -321,7 +295,8 @@ suspend fun postAndGetResult(file: File) : String = withContext(Dispatchers.IO){
         .addFormDataPart(
             "image",
             "image.png",
-            RequestBody.create(MediaType.parse("image/*"), file))
+            RequestBody.create(MediaType.parse("image/*"), file)
+        )
         .build()
 
     val request = Request.Builder()
@@ -332,7 +307,7 @@ suspend fun postAndGetResult(file: File) : String = withContext(Dispatchers.IO){
     try {
         val response = client.newCall(request).execute()
 
-        if (response.isSuccessful){
+        if (response.isSuccessful) {
             val responseBody = response.body()?.string()
 
             val gson = Gson()
@@ -351,3 +326,16 @@ data class Result(
     @SerializedName("predicted_class")
     val result: String
 )
+fun uriToBitmap(uri: Uri, context: Context): Bitmap? {
+    return try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val source = ImageDecoder.createSource(context.contentResolver, uri)
+            ImageDecoder.decodeBitmap(source)
+        } else {
+            MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+        }
+    } catch (e: IOException) {
+        e.printStackTrace()
+        null
+    }
+}
