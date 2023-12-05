@@ -55,6 +55,8 @@ import android.os.Build
 import android.provider.MediaStore
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
@@ -63,6 +65,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonDefaults.buttonColors
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -71,6 +77,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.consumeAllChanges
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.style.TextAlign
 import java.io.FileOutputStream
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -84,8 +91,7 @@ class MainActivity : ComponentActivity() {
             KidsWatchTheme {
                 // A surface container using the 'background' color from the theme
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background
                 ) {
                     App()
                 }
@@ -118,6 +124,13 @@ fun MainScreen(navController: NavController) {
     val scope = rememberCoroutineScope()
     val maxUrisSize = 3
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    val orange = Color(0xFFFFA500)
+    var showInstructions by remember { mutableStateOf(false) }
+
+    // 사용설명서 텍스트
+    val instructionsText = """
+        이 앱의 사용 방법으로는 ~와 같습니다.
+    """.trimIndent()
 
     Column(
         modifier = Modifier
@@ -131,26 +144,29 @@ fun MainScreen(navController: NavController) {
                 .fillMaxWidth()
                 .padding(bottom = 16.dp)
         ) {
-            Button(onClick = {})
-            {
+            Button(
+                onClick = {},
+                colors = buttonColors(orange),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .size(80.dp)
+            ) {
                 Text(
                     text = "Kidswatch",
+                    color = Color.Black,
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
                 )
             }
-            Spacer(modifier = Modifier.width(5.dp))
-            Button(onClick = {}, modifier = Modifier.padding(8.dp)) {
-                Text("메뉴")
-            }
         }
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         //카메라 퍼미션 확인
         var hasCameraPermission by remember {
             mutableStateOf(
                 ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.CAMERA
+                    context, Manifest.permission.CAMERA
                 ) == PackageManager.PERMISSION_GRANTED
             )
         }
@@ -163,9 +179,7 @@ fun MainScreen(navController: NavController) {
                 hasCameraPermission = true
             } else {
                 Toast.makeText(
-                    context,
-                    "Camera permission is required to take photos",
-                    Toast.LENGTH_LONG
+                    context, "Camera permission is required to take photos", Toast.LENGTH_LONG
                 ).show()
             }
         }
@@ -211,7 +225,6 @@ fun MainScreen(navController: NavController) {
         }
 
         Column(
-
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // 사진 보여주는 곳
@@ -226,11 +239,11 @@ fun MainScreen(navController: NavController) {
                 } else {
                     MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
                 }
-                Image(
-                    bitmap = headBitmap.asImageBitmap(),
+                Image(bitmap = headBitmap.asImageBitmap(),
                     contentDescription = "",
                     modifier = Modifier
                         .size(300.dp)
+                        .border(1.dp, Color.Black)
                         .clickable {
                             // 클릭한 이미지의 uri를 제거
                             selectUris?.let { currentUris ->
@@ -239,35 +252,82 @@ fun MainScreen(navController: NavController) {
                                     .toMutableList()
                                 selectUris = updatedUris
                             }
+                        })
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Button(
+                onClick = { showInstructions = !showInstructions },
+                modifier = Modifier
+                    .wrapContentWidth()
+            ) {
+                Text(if (showInstructions) "사용설명서 닫기" else "사용설명서 열기")
+            }
+        }
+
+        // 사용설명서 텍스트 (토글 상태에 따라 표시/숨김)
+        if (showInstructions) {
+            Text(
+                text = instructionsText,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
+        }
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Bottom,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+
+                ) {
+                // 사용자가 버튼을 눌렀을 때 카메라 실행
+                Button(
+                    onClick = {
+                        if (hasCameraPermission) {
+                            val uri = createImageUri()
+                            cameraLauncher.launch(uri)
+                        } else {
+                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                         }
-                )
+                    }, colors = buttonColors(orange),
+                    shape = RoundedCornerShape(5.dp)
+                ) {
+                    Text("카메라로 사진 찍기", color = Color.Black)
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Button(
+                    onClick = {}, colors = buttonColors(orange),
+                    shape = RoundedCornerShape(5.dp)
+                ) {
+                    Text("사진 가져오기", color = Color.Black)
+                }
             }
-        }
 
-        // 사용자가 버튼을 눌렀을 때 카메라 실행
-        Button(onClick = {
-            if (hasCameraPermission) {
-                val uri = createImageUri()
-                cameraLauncher.launch(uri)
-            } else {
-                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+//        Button(onClick = { navController.navigate("draw") }) {
+//            Text("그림판 이동")
+//        }
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = { navController.navigate("result/분석결과") },
+                colors = buttonColors(orange),
+                shape = RoundedCornerShape(5.dp),
+                modifier = Modifier.fillMaxWidth(5f)
+            ) {
+                Text("진단하기", color = Color.Black)
             }
-        }) {
-            Text("카메라로 사진 찍기")
-        }
-
-// 사용자가 버튼을 눌렀을 때 포토피커 실행
-        Button(onClick = {})
-        {
-            Text("사진 가져오기")
-        }
-
-        Button(onClick = { navController.navigate("draw") }) {
-            Text("그림판 이동")
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = { navController.navigate("result/분석결과") }) {
-            Text("진단하기")
         }
     }
 }
@@ -289,91 +349,78 @@ fun DrawScreen(navController: NavController) {
     val color = Color.Black  // 선의 색상
     val eraserRadius = 50f  // 지우개의 반지름
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { startOffset ->
-                        if (!eraseMode) {
-                            // 그리기 모드일 때는 선을 새로 시작
-                            currentLine = Line(start = startOffset, end = startOffset).apply {
-                                path.moveTo(startOffset.x, startOffset.y)
-                            }
-                        } else {
-                            // 지우개 모드일 때는 터치한 지점을 통과하는 모든 선을 제거
-                            lines = lines
-                                .filterNot { it.isTouching(startOffset, eraserRadius) }
-                                .toMutableList()
-                        }
-                        // 지우개의 위치를 업데이트
-                        eraserPosition = startOffset
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consumeAllChanges()
-                        if (eraseMode) {
-                            // 지우개 모드일 때는 터치한 지점을 통과하는 모든 선을 제거
-                            lines = lines
-                                .filterNot { it.isTouching(change.position, eraserRadius) }
-                                .toMutableList()
-                        } else {
-                            // 그리기 모드일 때는 선을 계속 그림
-                            currentLine?.let {
-                                it.end = change.position
-                                it.path.lineTo(change.position.x, change.position.y)
-                                lines = lines
-                                    .toMutableList()
-                                    .apply {
-                                        add(it)
-                                    }
-                                currentLine =
-                                    Line(start = change.position, end = change.position).apply {
-                                        path.moveTo(change.position.x, change.position.y)
-                                    }
-                            }
-                        }
-                        // 지우개의 위치를 업데이트
-                        eraserPosition = change.position
-                    },
-                    onDragEnd = {
-                        // 드래그가 끝나면 지우개의 위치를 null로 설정
-                        eraserPosition = null
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .pointerInput(Unit) {
+            detectDragGestures(onDragStart = { startOffset ->
+                if (!eraseMode) {
+                    // 그리기 모드일 때는 선을 새로 시작
+                    currentLine = Line(start = startOffset, end = startOffset).apply {
+                        path.moveTo(startOffset.x, startOffset.y)
                     }
+                } else {
+                    // 지우개 모드일 때는 터치한 지점을 통과하는 모든 선을 제거
+                    lines = lines
+                        .filterNot { it.isTouching(startOffset, eraserRadius) }
+                        .toMutableList()
+                }
+                // 지우개의 위치를 업데이트
+                eraserPosition = startOffset
+            }, onDrag = { change, dragAmount ->
+                change.consumeAllChanges()
+                if (eraseMode) {
+                    // 지우개 모드일 때는 터치한 지점을 통과하는 모든 선을 제거
+                    lines = lines
+                        .filterNot { it.isTouching(change.position, eraserRadius) }
+                        .toMutableList()
+                } else {
+                    // 그리기 모드일 때는 선을 계속 그림
+                    currentLine?.let {
+                        it.end = change.position
+                        it.path.lineTo(change.position.x, change.position.y)
+                        lines = lines
+                            .toMutableList()
+                            .apply {
+                                add(it)
+                            }
+                        currentLine = Line(start = change.position, end = change.position).apply {
+                            path.moveTo(change.position.x, change.position.y)
+                        }
+                    }
+                }
+                // 지우개의 위치를 업데이트
+                eraserPosition = change.position
+            }, onDragEnd = {
+                // 드래그가 끝나면 지우개의 위치를 null로 설정
+                eraserPosition = null
+            })
+        }) {
+        Canvas(modifier = Modifier.fillMaxSize(), onDraw = {
+            for (line in lines) {
+                // 모든 선을 그림
+                drawPath(
+                    path = line.path, color = color, style = Stroke(width = strokeWidth)
                 )
             }
-    ) {
-        Canvas(
-            modifier = Modifier.fillMaxSize(),
-            onDraw = {
-                for (line in lines) {
-                    // 모든 선을 그림
-                    drawPath(
-                        path = line.path,
-                        color = color,
-                        style = Stroke(width = strokeWidth)
+            if (eraseMode) {
+                // 지우개 모드일 때는 지우개의 범위를 표시
+                eraserPosition?.let {
+                    drawCircle(
+                        color = Color.Gray,
+                        radius = eraserRadius,
+                        center = it,
+                        style = Stroke(width = 2f)
                     )
                 }
-                if (eraseMode) {
-                    // 지우개 모드일 때는 지우개의 범위를 표시
-                    eraserPosition?.let {
-                        drawCircle(
-                            color = Color.Gray,
-                            radius = eraserRadius,
-                            center = it,
-                            style = Stroke(width = 2f)
-                        )
-                    }
-                }
             }
-        )
+        })
         Button(onClick = {
             // 지우기 버튼을 누르면 모든 선을 제거
             lines = mutableListOf()
         }) {
             Text(text = "지우기")
         }
-        Button(onClick = { eraseMode = !eraseMode }, modifier = Modifier.offset(y = 50.dp))
-        {
+        Button(onClick = { eraseMode = !eraseMode }, modifier = Modifier.offset(y = 50.dp)) {
             // 지우개 모드와 그리기 모드를 전환하는 버튼
             Text(text = if (eraseMode) "그리기 모드로 변경" else "지우개 모드로 변경")
         }
