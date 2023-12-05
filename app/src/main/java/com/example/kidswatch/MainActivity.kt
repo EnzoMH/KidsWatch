@@ -51,6 +51,8 @@ import android.os.Build
 import android.provider.MediaStore
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -59,6 +61,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults.buttonColors
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.Dispatchers
@@ -108,7 +113,6 @@ fun App() {
 fun MainScreen(navController: NavController) {
     val context = LocalContext.current
     var imageUri by remember { mutableStateOf<Uri?>(null) }
-//    var selectUris by remember { mutableStateOf<MutableList<Uri?>?>(mutableListOf()) }
     val scope = rememberCoroutineScope()
     var result by remember { mutableStateOf("") }
     val orange = Color(0xFFFFA500)
@@ -120,26 +124,25 @@ fun MainScreen(navController: NavController) {
 //        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-        ) {
-            Button(
-                onClick = {},
-                colors = buttonColors(orange),
-                shape = RoundedCornerShape(10.dp),
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .size(80.dp)
+                    .background(color = orange, shape = RoundedCornerShape(10.dp))
+                    .size(30.dp, 90.dp)
             ) {
                 Text(
                     text = "Kidswatch",
                     color = Color.Black,
+                    fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleLarge,
+                    fontSize = 25.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(30.dp)
                 )
             }
-        }
+
 
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -218,7 +221,6 @@ fun MainScreen(navController: NavController) {
                 )
             }
         }
-        Text(text = "분석 결과: $result")
 
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -243,7 +245,7 @@ fun MainScreen(navController: NavController) {
                     }, colors = buttonColors(orange),
                     shape = RoundedCornerShape(5.dp)
                 ) {
-                    Text("카메라로 사진 찍기", color = Color.Black)
+                    Text("사진 찍기", color = Color.Black)
                 }
                 val launcher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.PickVisualMedia(),
@@ -276,7 +278,7 @@ fun MainScreen(navController: NavController) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Button(
                 onClick = {
                     val uri = URLEncoder.encode(imageUri?.toString(), "UTF-8")
@@ -284,7 +286,7 @@ fun MainScreen(navController: NavController) {
                 },
                 colors = buttonColors(orange),
                 shape = RoundedCornerShape(5.dp),
-                modifier = Modifier.fillMaxWidth(5f)
+                modifier = Modifier.size(250.dp,70.dp)
             ) {
                 Text("진단하기", color = Color.Black)
             }

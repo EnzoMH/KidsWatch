@@ -10,12 +10,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -57,8 +59,8 @@ fun ResultScreen(result: String?, uri: String?) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(color = orange)
-                .size(30.dp, 50.dp)
+                .background(color = orange, shape = RoundedCornerShape(10.dp))
+                .size(30.dp, 80.dp)
         ) {
             Text(
                 text = "진단 결과",
@@ -67,7 +69,7 @@ fun ResultScreen(result: String?, uri: String?) {
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(10.dp)
+                    .padding(20.dp)
             )
         }
         Image(
@@ -78,23 +80,24 @@ fun ResultScreen(result: String?, uri: String?) {
                 .padding(16.dp)
         )
 
-            // 첫 번째 텍스트
-            Text(
-                text = danger,
-                color = if (danger == "위험") Color.Red else if (danger == "경고") Color.Blue else Color.Green,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                modifier = Modifier
-                    .padding(8.dp)
-            )
+        // 첫 번째 텍스트
+        Text(
+            text = danger,
+            color = if (danger == "위험") Color.Red else if (danger == "경고") Color.Blue else Color.Green,
+            fontWeight = FontWeight.Bold,
+            fontSize = 20.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .padding(10.dp)
+        )
 
-            // 두 번째 텍스트
-            Text(
-                text = script,
-                modifier = Modifier
-                    .padding(8.dp)
-            )
-
+        // 두 번째 텍스트
+        Text(
+            text = script,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .padding(10.dp)
+        )
     }
 }
 
