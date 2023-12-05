@@ -48,12 +48,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import android.Manifest
+import android.content.Context
 import android.content.ContentValues
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.os.Build
 import android.provider.MediaStore
-import androidx.compose.foundation.Canvas
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -63,7 +64,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -71,16 +75,23 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonDefaults.buttonColors
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
+
 import androidx.compose.ui.graphics.Path
+import androidx.compose.foundation.layout.width
+
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.consumeAllChanges
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.style.TextAlign
-import java.io.FileOutputStream
-import kotlin.math.pow
-import kotlin.math.sqrt
+import coil.compose.rememberImagePainter
+import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
+import java.io.IOException
+import java.net.URLEncoder
 
 
 class MainActivity : ComponentActivity() {
@@ -90,9 +101,7 @@ class MainActivity : ComponentActivity() {
 
             KidsWatchTheme {
                 // A surface container using the 'background' color from the theme
-                Surface(
-                    modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background
-                ) {
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     App()
                 }
             }
@@ -106,12 +115,11 @@ fun App() {
 
     NavHost(navController, startDestination = "main") {
         composable("main") { MainScreen(navController) }
-        composable("draw") { DrawScreen(navController) }
-        composable(
-            "result/{result}",
-            arguments = listOf(navArgument("result") { type = NavType.StringType })
-        ) { backStackEntry ->
-            ResultScreen(backStackEntry.arguments?.getString("result"))
+//        composable("draw") { DrawScreen(navController) }
+        composable("result/{result}/{uri}") {
+            val result = it.arguments?.getString("result")
+            val uri = it.arguments?.getString("uri")
+            ResultScreen(result, uri)
         }
     }
 }
@@ -120,23 +128,16 @@ fun App() {
 fun MainScreen(navController: NavController) {
     val context = LocalContext.current
     var imageUri by remember { mutableStateOf<Uri?>(null) }
-    var selectUris by remember { mutableStateOf<MutableList<Uri?>?>(mutableListOf()) }
+//    var selectUris by remember { mutableStateOf<MutableList<Uri?>?>(mutableListOf()) }
     val scope = rememberCoroutineScope()
-    val maxUrisSize = 3
-    var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var result by remember { mutableStateOf("") }
     val orange = Color(0xFFFFA500)
-    var showInstructions by remember { mutableStateOf(false) }
-
-    // 사용설명서 텍스트
-    val instructionsText = """
-        이 앱의 사용 방법으로는 ~와 같습니다.
-    """.trimIndent()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-//        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
@@ -166,7 +167,8 @@ fun MainScreen(navController: NavController) {
         var hasCameraPermission by remember {
             mutableStateOf(
                 ContextCompat.checkSelfPermission(
-                    context, Manifest.permission.CAMERA
+                    context,
+                    Manifest.permission.CAMERA
                 ) == PackageManager.PERMISSION_GRANTED
             )
         }
@@ -179,11 +181,12 @@ fun MainScreen(navController: NavController) {
                 hasCameraPermission = true
             } else {
                 Toast.makeText(
-                    context, "Camera permission is required to take photos", Toast.LENGTH_LONG
+                    context,
+                    "Camera permission is required to take photos",
+                    Toast.LENGTH_LONG
                 ).show()
             }
         }
-
         //카메라로 찍은 파일 Uri로 바꿔줌
         fun createImageUri(): Uri {
             val timestamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
@@ -206,17 +209,15 @@ fun MainScreen(navController: NavController) {
                 // 사진 촬영 성공, imageUri에 이미지가 저장됨
                 scope.launch {
                     imageUri?.let { uri ->
-                        //이미지 uri들을 selectUris에 하나씩 저장
-                        selectUris?.let { uris ->
-                            val newList = uris.toMutableList()
-                            newList.add(uri)
-                            selectUris = if (newList.size > maxUrisSize) {
-                                newList.takeLast(maxUrisSize).toMutableList()
-                            } else {
-                                newList
+                        val inputStream = context.contentResolver.openInputStream(uri)
+                        val file = File(context.cacheDir, "image.png")
+                        inputStream?.use { input ->
+                            file.outputStream().use { output ->
+                                input.copyTo(output)
                             }
                         }
-
+                        result = postAndGetResult(file)
+                        Log.d("result", result)
                     }
                 }
             } else {
@@ -224,249 +225,141 @@ fun MainScreen(navController: NavController) {
             }
         }
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // 사진 보여주는 곳
-            selectUris?.lastOrNull()?.let { uri ->
-                val headBitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    val decodeBitmap = ImageDecoder.decodeBitmap(
-                        ImageDecoder.createSource(
-                            context.contentResolver, uri
-                        )
-                    )
-                    decodeBitmap
-                } else {
-                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-                }
-                Image(bitmap = headBitmap.asImageBitmap(),
-                    contentDescription = "",
-                    modifier = Modifier
-                        .size(300.dp)
-                        .border(1.dp, Color.Black)
-                        .clickable {
-                            // 클릭한 이미지의 uri를 제거
-                            selectUris?.let { currentUris ->
-                                val updatedUris = currentUris
-                                    .filter { it != uri }
-                                    .toMutableList()
-                                selectUris = updatedUris
-                            }
-                        })
+
+        // 사용자가 버튼을 눌렀을 때 카메라 실행
+        Button(onClick = {
+            if (hasCameraPermission) {
+                val uri = createImageUri()
+                cameraLauncher.launch(uri)
+            } else {
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
             }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Button(
-                onClick = { showInstructions = !showInstructions },
-                modifier = Modifier
-                    .wrapContentWidth()
-            ) {
-                Text(if (showInstructions) "사용설명서 닫기" else "사용설명서 열기")
-            }
-        }
-
-        // 사용설명서 텍스트 (토글 상태에 따라 표시/숨김)
-        if (showInstructions) {
-            Text(
-                text = instructionsText,
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            )
-        }
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Bottom,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-
-            Row(
-                modifier = Modifier.padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-
-                ) {
-                // 사용자가 버튼을 눌렀을 때 카메라 실행
-                Button(
-                    onClick = {
-                        if (hasCameraPermission) {
-                            val uri = createImageUri()
-                            cameraLauncher.launch(uri)
-                        } else {
-                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                        }
-                    }, colors = buttonColors(orange),
-                    shape = RoundedCornerShape(5.dp)
-                ) {
-                    Text("카메라로 사진 찍기", color = Color.Black)
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                Button(
-                    onClick = {}, colors = buttonColors(orange),
-                    shape = RoundedCornerShape(5.dp)
-                ) {
-                    Text("사진 가져오기", color = Color.Black)
-                }
-            }
-
-//        Button(onClick = { navController.navigate("draw") }) {
-//            Text("그림판 이동")
-//        }
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = { navController.navigate("result/분석결과") },
-                colors = buttonColors(orange),
-                shape = RoundedCornerShape(5.dp),
-                modifier = Modifier.fillMaxWidth(5f)
-            ) {
-                Text("진단하기", color = Color.Black)
-            }
-        }
-    }
-}
-
-// 선을 표현하는 데이터 클래스
-data class Line(
-    var path: Path = Path(),  // 선의 경로
-    var start: Offset,  // 선의 시작점
-    var end: Offset  // 선의 끝점
-)
-
-@Composable
-fun DrawScreen(navController: NavController) {
-    var lines by remember { mutableStateOf(mutableListOf<Line>()) }  // 그려진 선들의 목록
-    var currentLine by remember { mutableStateOf<Line?>(null) }  // 현재 그리고 있는 선
-    var eraseMode by remember { mutableStateOf(false) }  // 지우개 모드인지 여부
-    var eraserPosition by remember { mutableStateOf<Offset?>(null) }  // 지우개의 위치
-    val strokeWidth = 10f  // 선의 굵기
-    val color = Color.Black  // 선의 색상
-    val eraserRadius = 50f  // 지우개의 반지름
-
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .pointerInput(Unit) {
-            detectDragGestures(onDragStart = { startOffset ->
-                if (!eraseMode) {
-                    // 그리기 모드일 때는 선을 새로 시작
-                    currentLine = Line(start = startOffset, end = startOffset).apply {
-                        path.moveTo(startOffset.x, startOffset.y)
-                    }
-                } else {
-                    // 지우개 모드일 때는 터치한 지점을 통과하는 모든 선을 제거
-                    lines = lines
-                        .filterNot { it.isTouching(startOffset, eraserRadius) }
-                        .toMutableList()
-                }
-                // 지우개의 위치를 업데이트
-                eraserPosition = startOffset
-            }, onDrag = { change, dragAmount ->
-                change.consumeAllChanges()
-                if (eraseMode) {
-                    // 지우개 모드일 때는 터치한 지점을 통과하는 모든 선을 제거
-                    lines = lines
-                        .filterNot { it.isTouching(change.position, eraserRadius) }
-                        .toMutableList()
-                } else {
-                    // 그리기 모드일 때는 선을 계속 그림
-                    currentLine?.let {
-                        it.end = change.position
-                        it.path.lineTo(change.position.x, change.position.y)
-                        lines = lines
-                            .toMutableList()
-                            .apply {
-                                add(it)
-                            }
-                        currentLine = Line(start = change.position, end = change.position).apply {
-                            path.moveTo(change.position.x, change.position.y)
-                        }
-                    }
-                }
-                // 지우개의 위치를 업데이트
-                eraserPosition = change.position
-            }, onDragEnd = {
-                // 드래그가 끝나면 지우개의 위치를 null로 설정
-                eraserPosition = null
-            })
         }) {
-        Canvas(modifier = Modifier.fillMaxSize(), onDraw = {
-            for (line in lines) {
-                // 모든 선을 그림
-                drawPath(
-                    path = line.path, color = color, style = Stroke(width = strokeWidth)
+            Text("카메라로 사진 찍기")
+        }
+
+        val launcher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickVisualMedia(),
+            onResult = { uri ->
+                if (uri != null) {
+                    scope.launch {
+                        imageUri = uri
+                        val inputStream = context.contentResolver.openInputStream(uri)
+                        val file = File(context.cacheDir, "image.png")
+                        inputStream?.use { input ->
+                            file.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        result = postAndGetResult(file)
+                    }
+                }
+            }
+        )
+
+        Button(onClick = { navController.navigate("draw") }) {
+            Text("그림판 이동")
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = {
+            launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }) {
+            Text("앨범에서 가져오기")
+        }
+        //selectUri가 null이 아닐 때만 이미지 표시 coil 라이브러리 사용
+        imageUri?.let { uri ->
+            val bitmap = uriToBitmap(uri, context)
+            bitmap?.asImageBitmap()?.let {
+                Image(
+                    bitmap = it,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(200.dp)
+                        .padding(16.dp)
                 )
             }
-            if (eraseMode) {
-                // 지우개 모드일 때는 지우개의 범위를 표시
-                eraserPosition?.let {
-                    drawCircle(
-                        color = Color.Gray,
-                        radius = eraserRadius,
-                        center = it,
-                        style = Stroke(width = 2f)
-                    )
-                }
+        }
+
+        Text(text = "분석 결과: $result")
+        Button(
+            onClick = {
+                val uri = URLEncoder.encode(imageUri?.toString(), "UTF-8")
+                navController.navigate("result/${result}/${uri}")
             }
-        })
-        Button(onClick = {
-            // 지우기 버튼을 누르면 모든 선을 제거
-            lines = mutableListOf()
-        }) {
-            Text(text = "지우기")
+        )
+        {
+            Text("진단하기")
         }
-        Button(onClick = { eraseMode = !eraseMode }, modifier = Modifier.offset(y = 50.dp)) {
-            // 지우개 모드와 그리기 모드를 전환하는 버튼
-            Text(text = if (eraseMode) "그리기 모드로 변경" else "지우개 모드로 변경")
-        }
-
-        Button(onClick = {
-            // 분석 결과 화면으로 이동
-            navController.navigate("result/분석결과")
-
-        }) {
-            Text("분석 하기")
-        }
-
     }
-}
-
-
-// 선이 특정 지점을 터치하는지 판단하는 함수
-fun Line.isTouching(point: Offset, radius: Float): Boolean {
-    val distanceToStart = sqrt((point.x - start.x).pow(2) + (point.y - start.y).pow(2))
-    val distanceToEnd = sqrt((point.x - end.x).pow(2) + (point.y - end.y).pow(2))
-    val lineLength = sqrt((start.x - end.x).pow(2) + (start.y - end.y).pow(2))
-
-    // 터치 지점이 선의 양 끝점 사이에 있거나 근처에 있으면 터치한 것으로 판단
-    return distanceToStart + distanceToEnd <= lineLength * 1.1 + 2 * radius
 }
 
 
 @Composable
-fun ResultScreen(result: String?) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "결과 화면",
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        Text(text = "분석 결과: $result")
+fun UriToFile(uri: Uri): File {
+    val context = LocalContext.current
+    val inputStream = context.contentResolver.openInputStream(uri)
+    val file = File(context.cacheDir, "image.png")
+    inputStream?.use { input ->
+        file.outputStream().use { output ->
+            input.copyTo(output)
+        }
     }
+    return file
 }
 
+suspend fun postAndGetResult(file: File): String = withContext(Dispatchers.IO) {
+    val url = "http://192.168.1.22:5000/predict"
+    val client = OkHttpClient()
+
+    val reqestBody = MultipartBody.Builder()
+        .setType(MultipartBody.FORM)
+        .addFormDataPart(
+            "image",
+            "image.png",
+            RequestBody.create(MediaType.parse("image/*"), file)
+        )
+        .build()
+
+    val request = Request.Builder()
+        .url(url)
+        .post(reqestBody)
+        .build()
+
+    try {
+        val response = client.newCall(request).execute()
+
+        if (response.isSuccessful) {
+            val responseBody = response.body()?.string()
+
+            val gson = Gson()
+            val result = gson.fromJson(responseBody, Result::class.java)
+            Log.d("result", result.toString())
+            return@withContext result.result
+        } else {
+            Log.d("result", "실패")
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    } as String
+}
+
+data class Result(
+    @SerializedName("predicted_class")
+    val result: String
+)
+fun uriToBitmap(uri: Uri, context: Context): Bitmap? {
+    return try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val source = ImageDecoder.createSource(context.contentResolver, uri)
+            ImageDecoder.decodeBitmap(source)
+        } else {
+            MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+        }
+    } catch (e: IOException) {
+        e.printStackTrace()
+        null
+    }
+}
 
 @Preview(showBackground = true)
 @Composable
