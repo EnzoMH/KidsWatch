@@ -1,9 +1,13 @@
 package com.example.kidswatch
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
@@ -13,7 +17,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.rememberImagePainter
 
 @Composable
@@ -39,6 +46,7 @@ fun ResultScreen(result: String?, uri: String?) {
         "경고(다람쥐+나뭇잎)" -> "경고"
         else -> "보통"
     }
+    val orange = Color(0xFFFFA500)
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -46,20 +54,54 @@ fun ResultScreen(result: String?, uri: String?) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "결과 화면",
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(color = orange)
+                .size(30.dp, 50.dp)
+        ) {
+            Text(
+                text = "진단 결과",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(10.dp)
+            )
+        }
         Image(
             painter = rememberImagePainter(uri),
             contentDescription = null,
             modifier = Modifier
-                .size(200.dp)
+                .size(350.dp)
                 .padding(16.dp)
         )
-        Text(text = danger, color = if (danger == "위험") Color.Red else if (danger == "경고") Color.Blue else Color.Green)
-        Text(text = script)
+
+            // 첫 번째 텍스트
+            Text(
+                text = danger,
+                color = if (danger == "위험") Color.Red else if (danger == "경고") Color.Blue else Color.Green,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                modifier = Modifier
+                    .padding(8.dp)
+            )
+
+            // 두 번째 텍스트
+            Text(
+                text = script,
+                modifier = Modifier
+                    .padding(8.dp)
+            )
+
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ResultScreenPreview() {
+    val result = "Your Result"
+    val uri = "Your Uri"
+    ResultScreen(result, uri)
 }

@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.DrawerDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -30,17 +29,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.navigation.NavController
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.example.kidswatch.ui.theme.KidsWatchTheme
 import kotlinx.coroutines.launch
 import java.io.File
@@ -49,38 +45,20 @@ import java.util.Date
 import java.util.Locale
 import android.Manifest
 import android.content.Context
-import android.content.ContentValues
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.os.Build
 import android.provider.MediaStore
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonDefaults.buttonColors
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-
-import androidx.compose.ui.graphics.Path
-import androidx.compose.foundation.layout.width
-
 import androidx.compose.ui.graphics.asImageBitmap
-import coil.compose.rememberImagePainter
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.Dispatchers
@@ -101,7 +79,9 @@ class MainActivity : ComponentActivity() {
 
             KidsWatchTheme {
                 // A surface container using the 'background' color from the theme
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background
+                ) {
                     App()
                 }
             }
@@ -137,7 +117,7 @@ fun MainScreen(navController: NavController) {
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
+//        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
@@ -167,8 +147,7 @@ fun MainScreen(navController: NavController) {
         var hasCameraPermission by remember {
             mutableStateOf(
                 ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.CAMERA
+                    context, Manifest.permission.CAMERA
                 ) == PackageManager.PERMISSION_GRANTED
             )
         }
@@ -181,12 +160,11 @@ fun MainScreen(navController: NavController) {
                 hasCameraPermission = true
             } else {
                 Toast.makeText(
-                    context,
-                    "Camera permission is required to take photos",
-                    Toast.LENGTH_LONG
+                    context, "Camera permission is required to take photos", Toast.LENGTH_LONG
                 ).show()
             }
         }
+
         //카메라로 찍은 파일 Uri로 바꿔줌
         fun createImageUri(): Uri {
             val timestamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
@@ -209,13 +187,15 @@ fun MainScreen(navController: NavController) {
                 // 사진 촬영 성공, imageUri에 이미지가 저장됨
                 scope.launch {
                     imageUri?.let { uri ->
-                        val inputStream = context.contentResolver.openInputStream(uri)
-                        val file = File(context.cacheDir, "image.png")
-                        inputStream?.use { input ->
-                            file.outputStream().use { output ->
-                                input.copyTo(output)
-                            }
-                        }
+                        val file = uriToFile(context, uri)
+
+//                        val inputStream = context.contentResolver.openInputStream(uri)
+//                        val file = File(context.cacheDir, "image.png")
+//                        inputStream?.use { input ->
+//                            file.outputStream().use { output ->
+//                                input.copyTo(output)
+//                            }
+//                        }
                         result = postAndGetResult(file)
                         Log.d("result", result)
                     }
@@ -225,47 +205,6 @@ fun MainScreen(navController: NavController) {
             }
         }
 
-
-        // 사용자가 버튼을 눌렀을 때 카메라 실행
-        Button(onClick = {
-            if (hasCameraPermission) {
-                val uri = createImageUri()
-                cameraLauncher.launch(uri)
-            } else {
-                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-            }
-        }) {
-            Text("카메라로 사진 찍기")
-        }
-
-        val launcher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.PickVisualMedia(),
-            onResult = { uri ->
-                if (uri != null) {
-                    scope.launch {
-                        imageUri = uri
-                        val inputStream = context.contentResolver.openInputStream(uri)
-                        val file = File(context.cacheDir, "image.png")
-                        inputStream?.use { input ->
-                            file.outputStream().use { output ->
-                                input.copyTo(output)
-                            }
-                        }
-                        result = postAndGetResult(file)
-                    }
-                }
-            }
-        )
-
-        Button(onClick = { navController.navigate("draw") }) {
-            Text("그림판 이동")
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = {
-            launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-        }) {
-            Text("앨범에서 가져오기")
-        }
         //selectUri가 null이 아닐 때만 이미지 표시 coil 라이브러리 사용
         imageUri?.let { uri ->
             val bitmap = uriToBitmap(uri, context)
@@ -279,24 +218,82 @@ fun MainScreen(navController: NavController) {
                 )
             }
         }
-
         Text(text = "분석 결과: $result")
-        Button(
-            onClick = {
-                val uri = URLEncoder.encode(imageUri?.toString(), "UTF-8")
-                navController.navigate("result/${result}/${uri}")
+
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Bottom,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+
+                ) {
+                // 사용자가 버튼을 눌렀을 때 카메라 실행
+                Button(
+                    onClick = {
+                        if (hasCameraPermission) {
+                            val uri = createImageUri()
+                            cameraLauncher.launch(uri)
+                        } else {
+                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    }, colors = buttonColors(orange),
+                    shape = RoundedCornerShape(5.dp)
+                ) {
+                    Text("카메라로 사진 찍기", color = Color.Black)
+                }
+                val launcher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.PickVisualMedia(),
+                    onResult = { uri ->
+                        if (uri != null) {
+                            scope.launch {
+                                imageUri = uri
+                                val file = uriToFile(context, uri)
+//                                val inputStream = context.contentResolver.openInputStream(uri)
+//                                val file = File(context.cacheDir, "image.png")
+//                                inputStream?.use { input ->
+//                                    file.outputStream().use { output ->
+//                                        input.copyTo(output)
+//                                    }
+//                                }
+                                result = postAndGetResult(file)
+                            }
+                        }
+                    }
+                )
+
+                Spacer(modifier = Modifier.width(16.dp))
+                Button(
+                    onClick = {
+                        launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }, colors = buttonColors(orange),
+                    shape = RoundedCornerShape(5.dp)
+                ) {
+                    Text("사진 가져오기", color = Color.Black)
+                }
             }
-        )
-        {
-            Text("진단하기")
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = {
+                    val uri = URLEncoder.encode(imageUri?.toString(), "UTF-8")
+                    navController.navigate("result/${result}/${uri}")
+                },
+                colors = buttonColors(orange),
+                shape = RoundedCornerShape(5.dp),
+                modifier = Modifier.fillMaxWidth(5f)
+            ) {
+                Text("진단하기", color = Color.Black)
+            }
         }
     }
 }
 
 
-@Composable
-fun UriToFile(uri: Uri): File {
-    val context = LocalContext.current
+fun uriToFile(context: Context, uri: Uri): File {
     val inputStream = context.contentResolver.openInputStream(uri)
     val file = File(context.cacheDir, "image.png")
     inputStream?.use { input ->
@@ -308,7 +305,7 @@ fun UriToFile(uri: Uri): File {
 }
 
 suspend fun postAndGetResult(file: File): String = withContext(Dispatchers.IO) {
-    val url = "http://192.168.1.22:5000/predict"
+    val url = "http://192.168.1.22:5000/predict" //trend wifi url
     val client = OkHttpClient()
 
     val reqestBody = MultipartBody.Builder()
@@ -347,6 +344,7 @@ data class Result(
     @SerializedName("predicted_class")
     val result: String
 )
+
 fun uriToBitmap(uri: Uri, context: Context): Bitmap? {
     return try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -360,6 +358,7 @@ fun uriToBitmap(uri: Uri, context: Context): Bitmap? {
         null
     }
 }
+
 
 @Preview(showBackground = true)
 @Composable
