@@ -199,18 +199,6 @@ fun MainScreen(navController: NavController) {
         }
     )
 
-    if (adBox) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-        ) {
-            LaunchedEffect(true) {
-                delay(3000) // 3 seconds delay
-                adBox = false
-            }
-        }
-    }
 
     Box(
         modifier = Modifier
@@ -347,6 +335,18 @@ fun MainScreen(navController: NavController) {
                         MenuList("고객문의", "https://www.notion.so/gonuai-seoul/KidWatch-58178cb2fe214fa68a8b93719338c4a3?pvs=4")
                     }
                 }
+            }
+        }
+    }
+    if (adBox) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            LaunchedEffect(true) {
+                delay(10000) // 3 seconds delay
+                adBox = false
             }
         }
     }
