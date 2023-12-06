@@ -56,6 +56,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -222,7 +223,7 @@ fun MainScreen(navController: NavController) {
                     .size(30.dp, 90.dp)
             ) {
                 Text(
-                    text = "Kidswatch",
+                    text = "Open Tree",
                     color = Color.Black,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleLarge,
@@ -332,7 +333,7 @@ fun MainScreen(navController: NavController) {
                             "https://www.google.com/search?sca_esv=587945461&tbs=lf:1,lf_ui:2&tbm=lcl&sxsrf=AM9HkKmuVUCMJbWXpysjddwXOeU1XxouXw:1701766776289&q=%EC%A0%95%EC%8B%A0%EA%B3%BC+%EB%B3%91%EC%9B%90&rflfq=1&num=10&sa=X&ved=2ahUKEwi8ocOh9_eCAxVYg1YBHQ3eDLgQjGp6BAgVEAE&biw=1536&bih=739&dpr=1.25#rlfi=hd:;si:;mv:[[37.5738732,126.9851049],[37.5383335,126.9335744]];tbs:lrf:!1m4!1u3!2m2!3m1!1e1!1m4!1u2!2m2!2m1!1e1!2m1!1e2!2m1!1e3!3sIAE,lf:1,lf_ui:2"
                         )
                         MenuList("간단 검사", "http://htp-test.com/mini/htp_test01_00.htm")
-                        MenuList("고객문의", "https://www.notion.so/gonuai-seoul/KidWatch-58178cb2fe214fa68a8b93719338c4a3?pvs=4")
+                        MenuList("고객문의", "https://www.notion.so/gonuai-seoul/F-Q-09afb65d51d6478cb9ee67b8e26917fc?pvs=4")
                     }
                 }
             }
@@ -348,6 +349,19 @@ fun MainScreen(navController: NavController) {
                 delay(10000) // 3 seconds delay
                 adBox = false
             }
+            Text("광고창입니다~", color = Color.White, modifier = Modifier.align(Alignment.Center))
+            Image(
+                painter = painterResource(id = R.drawable.baseline_close_24w),
+                contentDescription = "Close",
+                modifier = Modifier
+                    .size(24.dp)
+                    .clickable {
+                        // Handle close icon click here
+                        adBox = false
+                    }
+                    .align(Alignment.TopEnd)
+            )
+
         }
     }
 }
@@ -464,20 +478,21 @@ fun AdPlaces(adName: String, uriString: String) {
             .fillMaxWidth()
             .height(100.dp)
             .padding(10.dp)
-            .background(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        Color.Red,
-                        Color(1f, 0.5f, 0f), // Orange
-                        Color.Yellow,
-                        Color.Green,
-                        Color.Blue,
-                        Color(0.29f, 0f, 0.51f), // Indigo
-                        Color(0.54f, 0.17f, 0.88f) // Violet
-                    )
-                ),
-                shape = RoundedCornerShape(10.dp)
-            )
+            .border(1.dp, Color.Black)
+//            .background(
+//                brush = Brush.horizontalGradient(
+//                    colors = listOf(
+//                        Color.Red,
+//                        Color(1f, 0.5f, 0f), // Orange
+//                        Color.Yellow,
+//                        Color.Green,
+//                        Color.Blue,
+//                        Color(0.29f, 0f, 0.51f), // Indigo
+//                        Color(0.54f, 0.17f, 0.88f) // Violet
+//                    )
+//                ),
+//                shape = RoundedCornerShape(10.dp)
+//            )
             .clickable {
                 // 광고를 클릭할 때 수행할 작업 추가
                 isClicked = true
@@ -494,7 +509,7 @@ fun AdPlaces(adName: String, uriString: String) {
         // 광고 텍스트
         Text(
             text = adName,
-            color = Color.White,
+            color = Color.Black,
             fontWeight = FontWeight.Bold,
             style = MaterialTheme.typography.titleLarge,
             fontSize = 25.sp,
@@ -502,6 +517,17 @@ fun AdPlaces(adName: String, uriString: String) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(15.dp)
+        )
+        Image(
+            painter = painterResource(id = R.drawable.baseline_close_24),
+            contentDescription = "Close",
+            modifier = Modifier
+                .size(24.dp)
+                .clickable {
+                    // Handle close icon click here
+                    isClicked = false
+                }
+                .align(Alignment.TopEnd)
         )
     }
 }
