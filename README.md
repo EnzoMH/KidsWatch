@@ -1,3 +1,5 @@
+![OpenVino Project Image](child.png)
+
 **In English**
 
 **Intel future workforce program - OpenVino Project: AI-Based Child Drawing Psychological Diagnosis**
